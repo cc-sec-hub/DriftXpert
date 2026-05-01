@@ -12,8 +12,8 @@ cic_output2 = 2
 label_names = ['Benign', 'FTP-Patator', 'SSH-Patator', 'DoS-GoldenEye',
           'DoS-Hulk', 'DoS-Slowloris', 'DoS-SlowHttpTest', 'Bot', 'Web-BruteForce']
 
-local_drift_set1_path = '../IntrusionDetection/DriftXpert/Dataset/data/CICIDS-2017-LocalDrift-1.csv'
-local_drift_set2_path = '../IntrusionDetection/DriftXpert/Dataset/data/CICIDS-2017-LocalDrift-2.csv'
+local_drift_set1_path = '../data/CICIDS-2017-LocalDrift-1.csv'
+local_drift_set2_path = '../data/CICIDS-2017-LocalDrift-2.csv'
 
 l0main_set1_model_path = [
     'pkl/l0main/l0model-1.pkl',
@@ -25,42 +25,6 @@ l0main_set2_model_path = [
     'pkl/l0main/l0model-2.pkl',
     'pkl/l0main/l0encoder-2.pkl',
     'pkl/l0main/l0cls-2.pkl',
-]
-
-l1main_model_path = [
-    'pkl/l1main/l1model.pkl',
-    'pkl/l1main/l1encoder.pkl',
-    'pkl/l1main/l1cls.pkl',
-]
-
-l1_freeze_ec_path = [
-    'pkl/l1_freeze_ec/l1model.pkl',
-    'pkl/l1_freeze_ec/l1encoder.pkl',
-    'pkl/l1_freeze_ec/l1cls.pkl',
-]
-
-l1_not_freeze_model_path = [
-    'pkl/l1_not_freeze/l1model.pkl',
-    'pkl/l1_not_freeze/l1encoder.pkl',
-    'pkl/l1_not_freeze/l1cls.pkl',
-]
-
-l1_ft_model_path = [
-    'pkl/l1_ft/l1model.pkl',
-    'pkl/l1_ft/l1encoder.pkl',
-    'pkl/l1_ft/l1cls.pkl',
-]
-
-l1_ft_freeze_layer_model_path = [
-    'pkl/l1_ft_freeze_layer/l1model.pkl',
-    'pkl/l1_ft_freeze_layer/l1encoder.pkl',
-    'pkl/l1_ft_freeze_layer/l1cls.pkl',
-]
-
-l1_not_aggregation_path = [
-    'pkl/l1_not_aggregation/l1model.pkl',
-    'pkl/l1_not_aggregation/l1encoder.pkl',
-    'pkl/l1_not_aggregation/l1cls.pkl',
 ]
 
 column_names = ['Flow Duration', 'Total Fwd Packets', 'Total Backward Packets',
