@@ -16,4 +16,6 @@ git clone <your-repository-url>
 cd driftxpert
 
 # Install the dependencies
+conda create -n drift_xpert python=3.8.12
+conda activate drift_xpert
 pip install -r requirements.txt

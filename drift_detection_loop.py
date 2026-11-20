@@ -23,10 +23,10 @@ def do_loop(K, alpha):
                         n_clusters=K, devive=device)
 
     # load historical data
-    TrainX, TestX, _, _ = _data.LoadDataset(local_drift_set1_path, test_size=0.2)
+    TrainX, TestX, _, _ = _data.LoadDataset(global_drift_set1_path, test_size=0.2)
     model.fit(TrainX)
 
-    TestX, _ = _data.LoadDataset(local_drift_set1_path)
+    TestX, _ = _data.LoadDataset(global_drift_set1_path)
     distance_buckets = model.compute_distances_to_center(TestX)
     _historical_samples = TestX.shape[0]
 
@@ -45,7 +45,7 @@ def do_loop(K, alpha):
             print(f"Cluster {i}: No data in this cluster")
 
     # load recent data
-    TestX, _ = _data.LoadDataset(local_drift_set2_path)
+    TestX, _ = _data.LoadDataset(global_drift_set2_path)
 
     distance_buckets = model.compute_distances_to_center(TestX)
     _recent_samples = TestX.shape[0]
@@ -68,11 +68,11 @@ def do_loop(K, alpha):
 
 
 if __name__ == '__main__':
-    for i in range(50):
-        alpha = round(0.0 + i * 0.05, 2)
+    for i in range(100):
+        alpha = round(0.0 + i * 0.1, 1)
         OR, outliers = do_loop(5, alpha)
 
-        if outliers < 500:
+        if outliers < 100:
             break
 
         with open(f'txt/alpha_or/output_alpha.txt', 'a') as f:
