@@ -9,7 +9,6 @@ from torch.autograd import Variable
 from Models.Models import IDS, LoadIDS
 from Trainer.ContrastiveLoss import ContrastiveLoss
 from Config import *
-from matplotlib import rcParams
 from matplotlib.font_manager import FontProperties
 
 # 设置字体路径
@@ -69,8 +68,252 @@ class Trainer():
         run_time = end - start
         print('run time: %.2fs.' % run_time)
 
+    
+    def L1TrainFT(self, old_model_path, train_loader, model_path, freeze_layer=False):
+        start = time.time()
 
-    def Test(self, test_loader, set_type, model_path, smt_path : str=None):
+        model = torch.load(old_model_path).to(self.__device)
+        if freeze_layer is True:
+            for param in model.encoder.dense1.parameters():
+                param.requires_grad = False
+        
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.__lr)
+        ce_func = nn.CrossEntropyLoss()
+
+        model.train()
+        
+        for epoch in range(self.__epoch):
+            train_loss = 0
+            
+            for (X, labels) in train_loader:
+                X = X.float().to(self.__device)
+                labels = labels.long().to(self.__device)
+                
+                _logits, _ = model(X)
+
+                _labels = torch.zeros(len(labels), cic_output2).to(self.__device)
+                _labels = _labels.scatter_(1, labels.unsqueeze(1), 1)
+
+                loss = ce_func(_logits, _labels)
+
+                train_loss += loss.item()
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            print('Epoch [%d/%d] Loss: %.4f' % (epoch + 1, 
+                        self.__epoch, train_loss / len(train_loader)))
+
+        torch.save(model, model_path)
+        
+        end = time.time()
+        run_time = end - start
+        print('run time: %.2fs.' % run_time)
+
+    
+    def L1TrainFreezeEncoder(self, old_model_path, train_loader, model_path):
+        start = time.time()
+
+        model = torch.load(old_model_path).to(self.__device)
+        for param in model.encoder.parameters():
+            param.requires_grad = False
+        
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.__lr)
+        ce_func = nn.CrossEntropyLoss()
+
+        model.train()
+        
+        for epoch in range(self.__epoch):
+            train_loss = 0
+            
+            for (X, labels) in train_loader:
+                X = X.float().to(self.__device)
+                labels = labels.long().to(self.__device)
+                
+                _logits, _ = model(X)
+
+                _labels = torch.zeros(len(labels), cic_output2).to(self.__device)
+                _labels = _labels.scatter_(1, labels.unsqueeze(1), 1)
+
+                loss = ce_func(_logits, _labels)
+
+                train_loss += loss.item()
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            print('Epoch [%d/%d] Loss: %.4f' % (epoch + 1, 
+                        self.__epoch, train_loss / len(train_loader)))
+
+        torch.save(model, model_path)
+        
+        end = time.time()
+        run_time = end - start
+        print('run time: %.2fs.' % run_time)
+
+    
+    def L1Train(self, old_model_path, train_loader, model_path, encoder_path, 
+                cls_path, freeze_layer=False, aggregation=True, loss_path='jpg/ctt_loss.jpg'):
+        aggregated_model = torch.load(old_model_path).to(self.__device)
+        aggregated_model.eval()
+
+        model = torch.load(old_model_path).to(self.__device)
+        if freeze_layer is True:
+            for param in model.encoder.dense1.parameters():
+                param.requires_grad = False
+        
+        prev_model = copy.deepcopy(model)
+        prev_model.eval()
+        
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.__lr)
+        ce_func = nn.CrossEntropyLoss()
+        ctt_func = ContrastiveLoss(temperature=2.0)
+
+        model.train()
+        
+        for epoch in range(self.__epoch):
+            train_loss = 0
+            train_ce_loss = 0
+            train_ctt_loss = 0
+            for (X, labels) in train_loader:
+                X = X.float().to(self.__device)
+                labels = labels.long().to(self.__device)
+                
+                student_logits, z = model(X)
+
+                _labels = torch.zeros(len(labels), cic_output2).to(self.__device)
+                _labels = _labels.scatter_(1, labels.unsqueeze(1), 1)
+
+                ce_loss = ce_func(student_logits, _labels)
+                
+                _, z_con = aggregated_model(X)
+                _, z_prev = prev_model(X)
+
+                ctt_loss = ctt_func(z, z_con, z_prev)
+                mu = 1.0
+                loss = ce_loss + mu * ctt_loss
+
+                train_loss += loss.item()
+                train_ce_loss += ce_loss.item()
+                train_ctt_loss += ctt_loss
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            # copy model
+            prev_model = copy.deepcopy(model)
+            prev_model.eval()
+
+            torch.save(model, model_path)
+
+            if aggregation is True:
+                aggregated_model = self.aggregate_models(old_model_path, model_path, aggregated_model, alpha=0.5)
+
+            self.__ctt_loss.append(train_ctt_loss.cpu().item() / len(train_loader))
+            print('Epoch [%d/%d] Loss: %.4f, %.4f, %.4f' % (epoch + 1, 
+                        self.__epoch, train_loss / len(train_loader), 
+                        train_ce_loss / len(train_loader), train_ctt_loss / len(train_loader)))
+
+        if freeze_layer is True:
+            self.__plot_ctt_loss(loss_path)
+        
+        torch.save(model, model_path)
+        torch.save(model.encoder, encoder_path)
+        torch.save(model.dense, cls_path)
+
+    
+    def L1DriftDetection(self, old_model_path, old_encoder_path, train_loader, 
+                         freeze_layer=False, loss_path='jpg/drift_detection.jpg'):
+        old_model = torch.load(old_model_path).to(self.__device)
+        old_model.eval()
+
+        model = LoadIDS(old_encoder_path, cic_output1, cic_output2).to(self.__device)
+        if freeze_layer is True:
+            for param in model.encoder.dense1.parameters():
+                param.requires_grad = False
+        
+        prev_model = copy.deepcopy(model)
+        prev_model.eval()
+        
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.__lr)
+        ce_func = nn.CrossEntropyLoss()
+        ctt_func = ContrastiveLoss(temperature=2.0)
+
+        model.train()
+        
+        for epoch in range(self.__epoch):
+            train_loss = 0
+            train_ce_loss = 0
+            train_ctt_loss = 0
+            for (X, labels) in train_loader:
+                X = X.float().to(self.__device)
+                labels = labels.long().to(self.__device)
+                
+                student_logits, z = model(X)
+
+                _labels = torch.zeros(len(labels), cic_output2).to(self.__device)
+                _labels = _labels.scatter_(1, labels.unsqueeze(1), 1)
+
+                ce_loss = ce_func(student_logits, _labels)
+                
+                _, z_con = old_model(X)
+                _, z_prev = prev_model(X)
+
+                ctt_loss = ctt_func(z, z_con, z_prev)
+                mu = 1.0
+                loss = ce_loss + mu * ctt_loss
+
+                train_loss += loss.item()
+                train_ce_loss += ce_loss.item()
+                train_ctt_loss += ctt_loss
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            # copy model
+            prev_model = copy.deepcopy(model)
+            prev_model.eval()
+
+            # if (epoch != 0) & (prev_ctt_loss > train_ctt_loss.cpu().item() / len(train_loader)):
+            #     break
+
+            self.__ctt_loss.append(train_ctt_loss.cpu().item() / len(train_loader))
+
+            print('Epoch [%d/%d] Loss: %.4f, %.4f' % (epoch + 1, self.__epoch, 
+                            train_ce_loss / len(train_loader), 
+                            train_ctt_loss.cpu().item() / len(train_loader)))
+
+        self.__plot_ctt_loss(loss_path)
+
+    
+    def aggregate_models(self, model1_path: str, model2_path: str, output_model: nn.Module, alpha: float = 0.5):
+        model1 = torch.load(model1_path).to(self.__device)
+        model1_state_dict = model1.state_dict()
+        
+        model2 = torch.load(model2_path).to(self.__device)
+        model2_state_dict = model2.state_dict()
+
+        assert model1_state_dict.keys() == model2_state_dict.keys(), "The models must have the same architecture"
+
+        aggregated_state_dict = {}
+
+        for key in model1_state_dict.keys():
+            weight1 = model1_state_dict[key]
+            weight2 = model2_state_dict[key]
+
+            aggregated_weight = alpha * weight1 + (1 - alpha) * weight2
+
+            aggregated_state_dict[key] = aggregated_weight
+
+        output_model.load_state_dict(aggregated_state_dict)
+        return output_model
+
+
+    def Test(self, test_loader, set_type, model_path, smt_path: str=None):
         _model = torch.load(model_path).to(self.__device)
         _model.eval()  
         
