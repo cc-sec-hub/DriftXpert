@@ -148,7 +148,7 @@ If you use DriftXpert in your research, please cite:
   publisher = {Association for Computing Machinery},
   address   = {New York, NY, USA},
   location  = {The Hague, Netherlands},
-  pages     = {1--15},
+  pages     = {4537--4551},
   doi       = {10.1145/3830454.3846612}
 }
 ```
